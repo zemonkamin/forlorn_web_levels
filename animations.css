@@ -1,0 +1,67 @@
+@keyframes pulsing {
+    0% { opacity: 0.6; }
+    50% { opacity: 0.2; }
+    100% { opacity: 0.6; }
+}
+
+@keyframes fire1 {
+    0% { background-image: url('res/Fire_01_looped_001.png'); }
+    11% { background-image: url('res/Fire_01_looped_002.png'); }
+    22% { background-image: url('res/Fire_01_looped_003.png'); }
+    33% { background-image: url('res/Fire_01_looped_004.png'); }
+    44% { background-image: url('res/Fire_01_looped_005.png'); }
+    55% { background-image: url('res/Fire_01_looped_006.png'); }
+    66% { background-image: url('res/Fire_01_looped_007.png'); }
+    77% { background-image: url('res/Fire_01_looped_008.png'); }
+    88% { background-image: url('res/Fire_01_looped_009.png'); }
+    100% { background-image: url('res/Fire_01_looped_001.png'); }
+}
+
+@keyframes fire2 {
+    0% { background-image: url('res/Fire_02_looped_001.png'); }
+    11% { background-image: url('res/Fire_02_looped_002.png'); }
+    22% { background-image: url('res/Fire_02_looped_003.png'); }
+    33% { background-image: url('res/Fire_02_looped_004.png'); }
+    44% { background-image: url('res/Fire_02_looped_005.png'); }
+    55% { background-image: url('res/Fire_02_looped_006.png'); }
+    66% { background-image: url('res/Fire_02_looped_007.png'); }
+    77% { background-image: url('res/Fire_02_looped_008.png'); }
+    88% { background-image: url('res/Fire_02_looped_009.png'); }
+    100% { background-image: url('res/Fire_02_looped_001.png'); }
+}
+
+@keyframes firetrap {
+    0% { background-image: url('res/FireTrap_r_looped_001.png'); }
+    14% { background-image: url('res/FireTrap_r_looped_002.png'); }
+    28% { background-image: url('res/FireTrap_r_looped_003.png'); }
+    42% { background-image: url('res/FireTrap_r_looped_004.png'); }
+    56% { background-image: url('res/FireTrap_r_looped_005.png'); }
+    70% { background-image: url('res/FireTrap_r_looped_006.png'); }
+    84% { background-image: url('res/FireTrap_r_looped_007.png'); }
+    100% { background-image: url('res/FireTrap_r_looped_001.png'); }
+}
+
+.level-element.pulsing {
+    animation: pulsing 4s infinite;
+}
+
+.level-element.fire1-animation {
+    animation: fire1 1s infinite;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+.level-element.fire2-animation {
+    animation: fire2 1s infinite;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+.level-element.firetrap-animation {
+    animation: firetrap 1s infinite;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}

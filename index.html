@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Level Viewer with Fixed Debug Info</title>
+    <link rel="stylesheet" href="animations.css">
+    <style>
+        @font-face {
+            font-family: 'Pusab';
+            src: url('pusab.otf') format('opentype');
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Pusab', Arial, sans-serif;
+            text-shadow: 1px 1px 2px black;
+        }
+        #level-wrapper {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            transform-style: preserve-3d;
+            perspective: 1000px;
+            cursor: grab;
+            user-select: none;
+        }
+        #level-container {
+            position: absolute;
+            transform-origin: 0 0;
+            will-change: transform;
+            transform-style: preserve-3d;
+        }
+        .level-element {
+            position: absolute;
+            box-sizing: border-box;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            transform-origin: center center;
+            pointer-events: all;
+            transform-style: preserve-3d;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .level-element.placeholder {
+            border: 1px dashed rgba(255, 255, 255, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            font-family: 'Pusab', Arial, sans-serif;
+        }
+        .curved-element {
+            background-color: rgba(100, 255, 100, 0.2);
+            border: 1px dashed rgba(100, 255, 100, 0.7);
+        }
+        #loading {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 1000;
+            font-family: 'Pusab', Arial, sans-serif;
+        }
+        #loading .level-name {
+            color: #FFD700;
+            margin-left: 5px;
+        }
+        #error {
+            position: fixed;
+            top: 50px;
+            left: 10px;
+            color: red;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 1000;
+            white-space: pre-wrap;
+            font-family: 'Pusab', Arial, sans-serif;
+        }
+        #element-info {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+            font-size: 12px;
+            white-space: pre-wrap;
+            display: none;
+            font-family: Arial, sans-serif !important;
+        }
+        #element-info img {
+            max-width: 100px;
+            max-height: 100px;
+            margin: 5px 0;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        #controls {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        #controls div {
+            margin-bottom: 5px;
+        }
+        #coords-control {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        #coords-control input {
+            width: 60px;
+            margin: 0 5px;
+        }
+        #coords-control button {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin-left: 5px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        #file-input {
+            display: none;
+        }
+        .control-btn {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin: 2px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .debug-container {
+            position: absolute;
+            pointer-events: none;
+            z-index: 1000;
+            width: 100%;
+            height: 100%;
+        }
+        .debug-info {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 5px;
+            font-size: 12px;
+            display: none;
+            width: 200px;
+            white-space: normal;
+            word-wrap: break-word;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            transform: none !important;
+            font-family: Arial, sans-serif;
+        }
+        .level-element:hover .debug-info {
+            display: block;
+        }
+        #json-selector {
+            position: fixed;
+            top: 40px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 1000;
+            font-family: 'Pusab', Arial, sans-serif;
+        }
+        #json-selector select {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 5px;
+            border-radius: 3px;
+            margin-left: 5px;
+        }
+        @keyframes pulsing {
+            0% { opacity: 0.8; }
+            50% { opacity: 0.4; }
+            100% { opacity: 0.8; }
+        }
+        .level-element.pulsing {
+            animation: pulsing 2s infinite;
+        }
+
+        @keyframes fire1 {
+            0% { background-image: url('res/Fire_01_looped_001.png'); }
+            11% { background-image: url('res/Fire_01_looped_002.png'); }
+            22% { background-image: url('res/Fire_01_looped_003.png'); }
+            33% { background-image: url('res/Fire_01_looped_004.png'); }
+            44% { background-image: url('res/Fire_01_looped_005.png'); }
+            55% { background-image: url('res/Fire_01_looped_006.png'); }
+            66% { background-image: url('res/Fire_01_looped_007.png'); }
+            77% { background-image: url('res/Fire_01_looped_008.png'); }
+            88% { background-image: url('res/Fire_01_looped_009.png'); }
+            100% { background-image: url('res/Fire_01_looped_001.png'); }
+        }
+
+        @keyframes fire2 {
+            0% { background-image: url('res/Fire_02_looped_001.png'); }
+            11% { background-image: url('res/Fire_02_looped_002.png'); }
+            22% { background-image: url('res/Fire_02_looped_003.png'); }
+            33% { background-image: url('res/Fire_02_looped_004.png'); }
+            44% { background-image: url('res/Fire_02_looped_005.png'); }
+            55% { background-image: url('res/Fire_02_looped_006.png'); }
+            66% { background-image: url('res/Fire_02_looped_007.png'); }
+            77% { background-image: url('res/Fire_02_looped_008.png'); }
+            88% { background-image: url('res/Fire_02_looped_009.png'); }
+            100% { background-image: url('res/Fire_02_looped_001.png'); }
+        }
+
+        @keyframes fire_r {
+            0% { background-image: url('res/Fire_r_02.png'); }
+            11% { background-image: url('res/Fire_r_03.png'); }
+            22% { background-image: url('res/Fire_r_04.png'); }
+            33% { background-image: url('res/Fire_r_05.png'); }
+            44% { background-image: url('res/Fire_r_06.png'); }
+            55% { background-image: url('res/Fire_r_07.png'); }
+            66% { background-image: url('res/Fire_r_08.png'); }
+            77% { background-image: url('res/Fire_r_09.png'); }
+            88% { background-image: url('res/Fire_r_10.png'); }
+            100% { background-image: url('res/Fire_r_02.png'); }
+        }
+
+        @keyframes firetrap {
+            0% { background-image: url('res/FireTrap_r_looped_001.png'); }
+            11% { background-image: url('res/FireTrap_r_looped_002.png'); }
+            22% { background-image: url('res/FireTrap_r_looped_003.png'); }
+            33% { background-image: url('res/FireTrap_r_looped_004.png'); }
+            44% { background-image: url('res/FireTrap_r_looped_005.png'); }
+            55% { background-image: url('res/FireTrap_r_looped_006.png'); }
+            66% { background-image: url('res/FireTrap_r_looped_007.png'); }
+            77% { background-image: url('res/FireTrap_r_looped_008.png'); }
+            88% { background-image: url('res/FireTrap_r_looped_009.png'); }
+            100% { background-image: url('res/FireTrap_r_looped_001.png'); }
+        }
+
+        .level-element.fire1-animation {
+            animation: fire1 1s infinite;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .level-element.fire2-animation {
+            animation: fire2 1s infinite;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .level-element.fire-r-animation {
+            animation: fire_r 1s infinite;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .level-element.firetrap-animation {
+            animation: firetrap 1s infinite;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .game-layer {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+        }
+
+        .object-layer {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+        }
+
+        .parallax-layer {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Ready to load level</div>
+    <div id="error"></div>
+    <div id="element-info"></div>
+    
+    <div id="json-selector">
+        Load JSON: 
+        <select id="json-files">
+            <option value="">Select a file...</option>
+        </select>
+    </div>
+    
+    <div id="coords-control">
+        X: <input type="number" id="coord-x" placeholder="X">
+        Y: <input type="number" id="coord-y" placeholder="Y">
+        <button id="go-to-coords">Go</button>
+    </div>
+    
+    <div id="level-wrapper">
+        <div id="level-container"></div>
+    </div>
+    
+    <div id="controls">
+        <label for="file-input" class="control-btn">Load JSON</label>
+        <input type="file" id="file-input" accept=".json">
+        <button class="control-btn" id="zoom-in">+ Zoom In</button>
+        <button class="control-btn" id="zoom-out">- Zoom Out</button>
+        <button class="control-btn" id="reset-view">Reset View</button>
+        <div>Use arrows to pan</div>
+        <a href="https://github.com/zemonkamin/forlorn_web_levels" target="_blank" class="control-btn">Source code</a>
+    </div>
+
+    <script>
+        // Camera control
+        const camera = { x: 0, y: 0, scale: 1 };
+        let levelData = { width: 512, height: 399, elements: [] };
+        const textureCache = new Map();
+        const levelContainer = document.getElementById('level-container');
+        const levelWrapper = document.getElementById('level-wrapper');
+        let isDragging = false;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+
+        // Initialize camera controls
+        function initCameraControls() {
+            // Mouse controls
+            levelWrapper.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                levelWrapper.style.cursor = 'grabbing';
+            });
+
+            levelWrapper.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                
+                const deltaX = e.clientX - lastMouseX;
+                const deltaY = e.clientY - lastMouseY;
+                
+                camera.x += deltaX;
+                camera.y += deltaY;
+                
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                
+                updateCamera();
+            });
+
+            levelWrapper.addEventListener('mouseup', () => {
+                isDragging = false;
+                levelWrapper.style.cursor = 'grab';
+            });
+
+            levelWrapper.addEventListener('mouseleave', () => {
+                isDragging = false;
+                levelWrapper.style.cursor = 'grab';
+            });
+
+            // Touch controls
+            levelWrapper.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Предотвращаем скролл страницы
+                isDragging = true;
+                lastMouseX = e.touches[0].clientX;
+                lastMouseY = e.touches[0].clientY;
+                levelWrapper.style.cursor = 'grabbing';
+            });
+
+            levelWrapper.addEventListener('touchmove', (e) => {
+                e.preventDefault(); // Предотвращаем скролл страницы
+                if (!isDragging) return;
+                
+                const deltaX = e.touches[0].clientX - lastMouseX;
+                const deltaY = e.touches[0].clientY - lastMouseY;
+                
+                camera.x += deltaX;
+                camera.y += deltaY;
+                
+                lastMouseX = e.touches[0].clientX;
+                lastMouseY = e.touches[0].clientY;
+                
+                updateCamera();
+            });
+
+            levelWrapper.addEventListener('touchend', () => {
+                isDragging = false;
+                levelWrapper.style.cursor = 'grab';
+            });
+
+            // Pinch zoom
+            let initialPinchDistance = 0;
+            levelWrapper.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    initialPinchDistance = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                }
+            });
+
+            levelWrapper.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    const currentPinchDistance = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    
+                    const delta = currentPinchDistance / initialPinchDistance;
+                    zoom(delta);
+                    
+                    initialPinchDistance = currentPinchDistance;
+                }
+            });
+
+            // Wheel zoom
+            levelWrapper.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                zoom(delta);
+            });
+
+            // Keyboard controls (оставляем как альтернативу)
+            document.addEventListener('keydown', (e) => {
+                const moveStep = 30 / camera.scale;
+                
+                switch(e.key) {
+                    case 'ArrowUp': camera.y += moveStep; break;
+                    case 'ArrowDown': camera.y -= moveStep; break;
+                    case 'ArrowLeft': camera.x += moveStep; break;
+                    case 'ArrowRight': camera.x -= moveStep; break;
+                    case '=': zoom(1.2); break;
+                    case '-': zoom(1/1.2); break;
+                    case '0': resetView(); break;
+                }
+                
+                updateCamera();
+            });
+            
+            // Button controls
+            document.getElementById('zoom-in').addEventListener('click', () => zoom(1.2));
+            document.getElementById('zoom-out').addEventListener('click', () => zoom(1/1.2));
+            document.getElementById('reset-view').addEventListener('click', resetView);
+            
+            // Coordinate navigation
+            document.getElementById('go-to-coords').addEventListener('click', () => {
+                const x = parseFloat(document.getElementById('coord-x').value) || 0;
+                const y = parseFloat(document.getElementById('coord-y').value) || 0;
+                moveCameraTo(x, y);
+            });
+            
+            document.getElementById('coord-x').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') document.getElementById('go-to-coords').click();
+            });
+            
+            document.getElementById('coord-y').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') document.getElementById('go-to-coords').click();
+            });
+        }
+
+        function zoom(factor) {
+            camera.scale *= factor;
+            camera.scale = Math.max(0.1, Math.min(camera.scale, 10));
+            updateCamera();
+        }
+
+        function resetView() {
+            const wrapperWidth = levelWrapper.clientWidth;
+            const wrapperHeight = levelWrapper.clientHeight;
+            
+            const scaleX = wrapperWidth / levelData.width;
+            const scaleY = wrapperHeight / levelData.height;
+            camera.scale = Math.min(scaleX, scaleY) * 0.9;
+            
+            if (levelData.startPoint) {
+                camera.x = -levelData.startPoint.x * camera.scale + wrapperWidth/2;
+                camera.y = -levelData.startPoint.y * camera.scale + wrapperHeight/2;
+            } else {
+                camera.x = (wrapperWidth - levelData.width * camera.scale) / 2;
+                camera.y = (wrapperHeight - levelData.height * camera.scale) / 2;
+            }
+            
+            updateCamera();
+        }
+
+        function updateCamera() {
+            levelContainer.style.transform = `
+                translate(${camera.x}px, ${camera.y}px)
+                scale(${camera.scale})
+            `;
+            
+            const wrapperWidth = levelWrapper.clientWidth;
+            const wrapperHeight = levelWrapper.clientHeight;
+            const centerX = (-camera.x + wrapperWidth/2) / camera.scale;
+            const centerY = (levelData.height - (-camera.y + wrapperHeight/2) / camera.scale);
+            
+            document.getElementById('coord-x').value = Math.round(centerX);
+            document.getElementById('coord-y').value = Math.round(centerY);
+        }
+
+        function moveCameraTo(x, y) {
+            const wrapperWidth = levelWrapper.clientWidth;
+            const wrapperHeight = levelWrapper.clientHeight;
+            
+            camera.x = -x * camera.scale + wrapperWidth/2;
+            camera.y = -(levelData.height - y) * camera.scale + wrapperHeight/2;
+            
+            updateCamera();
+        }
+
+        // Texture loading
+        function loadTexture(texturePath) {
+            if (!texturePath) return Promise.resolve(null);
+            if (textureCache.has(texturePath)) return Promise.resolve(textureCache.get(texturePath));
+            
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    textureCache.set(texturePath, img);
+                    resolve(img);
+                };
+                img.onerror = () => {
+                    console.warn(`Failed to load texture: ${texturePath}`);
+                    resolve(null);
+                };
+                img.src = `res/${texturePath}`;
+            });
+        }
+
+        // Level loading and parsing
+        async function loadAndBuildLevel(jsonContent) {
+            try {
+                document.getElementById('loading').innerHTML = "Parsing level data...";
+                document.getElementById('error').textContent = '';
+                
+                const jsonData = JSON.parse(jsonContent);
+                levelData = prepareLevelData(jsonData);
+                
+                await buildLevel(levelData);
+                resetView();
+                
+                document.getElementById('loading').innerHTML = 
+                    `Level loaded: <span class="level-name">${jsonData.settings?.introLevelText || 'Untitled'}</span>`;
+            } catch (error) {
+                console.error('Level loading error:', error);
+                document.getElementById('error').textContent = `Error: ${error.message}`;
+                document.getElementById('loading').textContent = 'Failed to load level';
+            }
+        }
+
+        function prepareLevelData(jsonData) {
+            const levelSize = jsonData.levelSize || [512, 399];
+            const elements = [];
+            
+            // Загрузка спрайтшитов
+            if (jsonData.sheetContainer) {
+                Object.values(jsonData.sheetContainer).forEach(sheet => {
+                    if (sheet.texture) {
+                        loadTexture(`${sheet.texture}.png`);
+                    }
+                });
+            }
+            
+            // Загрузка блоков
+            if (jsonData.blockContainer) {
+                Object.entries(jsonData.blockContainer).forEach(([id, elementData]) => {
+                    elements.push({
+                        id,
+                        ...parseElementData(elementData, levelSize[1])
+                    });
+                });
+            }
+            
+            return {
+                width: levelSize[0],
+                height: levelSize[1],
+                elements,
+                bgImage: jsonData.settings?.bgImage,
+                startPoint: jsonData.playerSpawn ? 
+                    { x: jsonData.playerSpawn[0], y: jsonData.playerSpawn[1] } : 
+                    null
+            };
+        }
+
+        function parseElementData(elementData, levelHeight) {
+            // Position
+            const position = Array.isArray(elementData.position) ? 
+                { x: elementData.position[0], y: levelHeight - elementData.position[1] } :
+                { x: 0, y: levelHeight };
+            
+            // Scale
+            const scale = Array.isArray(elementData.scale) ? 
+                { x: elementData.scale[0], y: elementData.scale[1] } : 
+                { x: 1, y: 1 };
+            
+            // Flipped
+            const flipped = Array.isArray(elementData.flipped) ? 
+                { x: elementData.flipped[0], y: elementData.flipped[1] } : 
+                { x: 0, y: 0 };
+            
+            // Rotation
+            const rotation = typeof elementData.rotation === 'number' ? elementData.rotation : 0;
+            
+            // Size calculation
+            const size = calculateElementSize(elementData);
+            
+            // Appearance
+            const appearance = getAppearance(elementData);
+            
+            // Particle data
+            let particleData = null;
+            if (elementData.type === 'particle' && elementData.plist) {
+                particleData = parsePlistData(elementData.plist);
+            }
+            
+            return {
+                position,
+                size,
+                scale,
+                flipped,
+                rotation,
+                appearance,
+                type: elementData.type || 'unknown',
+                texture: elementData.texture || null,
+                zValue: elementData.zValue || 0,
+                points: elementData.points ? transformPoints(elementData.points, levelHeight) : null,
+                particleData,
+                elementData
+            };
+        }
+
+        function parsePlistData(plistData) {
+            // Парсим XML данные из plist
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(plistData, "text/xml");
+            
+            // Получаем основные параметры партикла
+            const getValue = (key) => {
+                const element = xmlDoc.querySelector(key);
+                return element ? parseFloat(element.textContent) : 0;
+            };
+            
+            return {
+                maxParticles: getValue('maxParticles'),
+                particleLifespan: getValue('particleLifespan'),
+                particleLifespanVariance: getValue('particleLifespanVariance'),
+                startParticleSize: getValue('startParticleSize'),
+                startParticleSizeVariance: getValue('startParticleSizeVariance'),
+                finishParticleSize: getValue('finishParticleSize'),
+                finishParticleSizeVariance: getValue('finishParticleSizeVariance'),
+                startColor: {
+                    r: getValue('startColorRed'),
+                    g: getValue('startColorGreen'),
+                    b: getValue('startColorBlue'),
+                    a: getValue('startColorAlpha')
+                },
+                finishColor: {
+                    r: getValue('finishColorRed'),
+                    g: getValue('finishColorGreen'),
+                    b: getValue('finishColorBlue'),
+                    a: getValue('finishColorAlpha')
+                },
+                texture: xmlDoc.querySelector('textureFileName')?.textContent,
+                sourcePosition: {
+                    x: getValue('sourcePositionx'),
+                    y: getValue('sourcePositiony')
+                },
+                sourcePositionVariance: {
+                    x: getValue('sourcePositionVariancex'),
+                    y: getValue('sourcePositionVariancey')
+                }
+            };
+        }
+
+        function transformPoints(points, levelHeight) {
+            const transformed = {};
+            Object.entries(points).forEach(([key, point]) => {
+                transformed[key] = {
+                    ...point,
+                    position: [point.position[0], levelHeight - point.position[1]]
+                };
+            });
+            return transformed;
+        }
+
+        function calculateElementSize(elementData) {
+            // Список спрайтшитов, требующих дополнительного масштабирования
+            const noHDSheets = [
+                "ForestSheet_MG",
+                "lightSheet",
+                "FrostLevel_MGSheet",
+                "FlameVillageMG",
+                "ForestSheet",
+                "ForestSheet_HD",
+                "FrostLevel_Sheet",
+                "FrostLevel_Sheet_HD",
+                "FlameVillage_Sheet",
+                "FlameVillage_Sheet_HD"
+            ];
+
+            // Определяем множитель масштаба в зависимости от спрайтшита
+            let scaleMultiplier = 1.0;
+            if (elementData.spriteSheet && noHDSheets.includes(elementData.spriteSheet)) {
+                scaleMultiplier = 2.0;
+            }
+
+            // Получаем базовый масштаб из данных элемента
+            const baseScale = Array.isArray(elementData.scale) ? elementData.scale : [1, 1];
+            
+            // Для элементов с текстурой используем размеры изображения
+            if (elementData.texture && textureCache.has(elementData.texture)) {
+                const img = textureCache.get(elementData.texture);
+                // В OpenGL размеры задаются в пикселях и масштабируются
+                return {
+                    width: img.width * baseScale[0] * scaleMultiplier,
+                    height: img.height * baseScale[1] * scaleMultiplier
+                };
+            }
+            
+            // Для curved элементов с точками
+            if (elementData.type === 'curved' && elementData.points) {
+                const points = Object.values(elementData.points).map(p => p.position);
+                const xs = points.map(p => p[0]);
+                const ys = points.map(p => p[1]);
+                const baseWidth = Math.max(...xs) - Math.min(...xs);
+                const baseHeight = Math.max(...ys) - Math.min(...ys);
+                return {
+                    width: baseWidth * baseScale[0] * scaleMultiplier,
+                    height: baseHeight * baseScale[1] * scaleMultiplier
+                };
+            }
+            
+            // Базовые размеры в пикселях для разных типов элементов
+            let baseWidth = 100;
+            let baseHeight = 100;
+            
+            switch(elementData.type) {
+                case 'particle':
+                    baseWidth = 30;
+                    baseHeight = 30;
+                    break;
+                case 'light':
+                    baseWidth = 100;
+                    baseHeight = 100;
+                    break;
+                default:
+                    baseWidth = 100;
+                    baseHeight = 100;
+            }
+            
+            // Применяем масштабирование к базовым размерам
+            return {
+                width: baseWidth * baseScale[0] * scaleMultiplier,
+                height: baseHeight * baseScale[1] * scaleMultiplier
+            };
+        }
+
+        function getAppearance(elementData) {
+            const type = elementData.type || '';
+            const texture = elementData.texture || '';
+            
+            let color = 'rgba(100, 100, 255, 0.7)';
+            let text = texture || type || 'element';
+            let classes = [];
+            
+            if (elementData.customAnim) {
+                classes.push(elementData.customAnim);
+            }
+            
+            if (type === 'curved') {
+                color = 'rgba(100, 255, 100, 0.5)';
+                text = 'Curved Ground';
+            } 
+            else if (texture.includes('Fire')) {
+                color = 'rgba(255, 100, 0, 0.8)';
+                text = 'Fire';
+            } 
+            else if (texture.includes('crystal')) {
+                color = 'rgba(200, 0, 200, 0.8)';
+                text = 'Crystal';
+            }
+            else if (texture.includes('snowground')) {
+                color = 'rgba(200, 200, 255, 0.8)';
+                text = 'Ground';
+            }
+            else if (texture.includes('mountain')) {
+                color = 'rgba(150, 150, 150, 0.8)';
+                text = 'Mountain';
+            }
+            else if (texture.includes('torch')) {
+                color = 'rgba(255, 200, 0, 0.8)';
+                text = 'Torch';
+            }
+            
+            return { color, text, classes };
+        }
+
+        async function buildLevel(levelData) {
+            // Создаем основной контейнер с масштабом 2.0
+            levelContainer.innerHTML = '';
+            levelContainer.style.width = `${levelData.width}px`;
+            levelContainer.style.height = `${levelData.height}px`;
+            levelContainer.style.transform = 'scale(2.0)';
+            levelContainer.style.transformOrigin = '0 0';
+            
+            // Создаем контейнер для фона
+            const backgroundContainer = document.createElement('div');
+            backgroundContainer.style.position = 'fixed';
+            backgroundContainer.style.top = '0';
+            backgroundContainer.style.left = '0';
+            backgroundContainer.style.width = '100%';
+            backgroundContainer.style.height = '100%';
+            backgroundContainer.style.zIndex = '-1';
+            document.body.appendChild(backgroundContainer);
+            
+            // Создаем слои
+            const gameLayer = document.createElement('div');
+            gameLayer.className = 'game-layer';
+            
+            const objectLayer = document.createElement('div');
+            objectLayer.className = 'object-layer';
+            
+            const parallaxLayer = document.createElement('div');
+            parallaxLayer.className = 'parallax-layer';
+            
+            // Добавляем слои в иерархию
+            gameLayer.appendChild(objectLayer);
+            objectLayer.appendChild(parallaxLayer);
+            levelContainer.appendChild(gameLayer);
+            
+            // Загрузка фона
+            if (levelData.bgImage) {
+                try {
+                    await loadTexture(`${levelData.bgImage}.png`);
+                    const background = document.createElement('div');
+                    background.className = 'level-element';
+                    background.style.backgroundImage = `url('res/${levelData.bgImage}.png')`;
+                    background.style.width = '100%';
+                    background.style.height = '100%';
+                    background.style.position = 'absolute';
+                    background.style.left = '0';
+                    background.style.top = '0';
+                    background.style.backgroundSize = 'cover';
+                    backgroundContainer.appendChild(background);
+                } catch {
+                    backgroundContainer.style.backgroundColor = '#333';
+                }
+            }
+            
+            // Предварительная загрузка текстур
+            const texturePromises = levelData.elements
+                .filter(el => el.texture)
+                .map(el => el.texture)
+                .filter((value, index, self) => self.indexOf(value) === index)
+                .map(loadTexture);
+            
+            await Promise.all(texturePromises);
+            
+            // Сортировка элементов по zValue (от меньшего к большему)
+            levelData.elements.sort((a, b) => a.zValue - b.zValue);
+            
+            // Создание элементов
+            levelData.elements.forEach(element => {
+                const el = document.createElement('div');
+                el.className = `level-element ${element.type === 'curved' ? 'curved-element' : ''}`;
+                el.dataset.id = element.id;
+                
+                // Позиционирование и размеры
+                if (element.type === 'curved' && element.points) {
+                    const points = Object.values(element.points).map(p => p.position);
+                    const minX = Math.min(...points.map(p => p[0]));
+                    const minY = Math.min(...points.map(p => p[1]));
+                    
+                    el.style.left = `${minX}px`;
+                    el.style.top = `${minY}px`;
+                    el.style.width = `${element.size.width}px`;
+                    el.style.height = `${element.size.height}px`;
+                } else {
+                    el.style.left = `${element.position.x - element.size.width/2}px`;
+                    el.style.top = `${element.position.y - element.size.height/2}px`;
+                    el.style.width = `${element.size.width}px`;
+                    el.style.height = `${element.size.height}px`;
+                }
+                
+                // Устанавливаем z-index из zValue
+                el.style.zIndex = element.zValue;
+                
+                // Трансформации
+                let transform = '';
+                
+                if (!element.type === 'curved') {
+                    transform = 'translate(-50%, -50%) ';
+                }
+                
+                if (element.flipped.x || element.flipped.y) {
+                    transform += `scale(${element.flipped.x ? -1 : 1}, ${element.flipped.y ? -1 : 1}) `;
+                }
+                
+                if (element.rotation) {
+                    transform += `rotate(${element.rotation}deg) `;
+                }
+                
+                if (element.scale.x !== 1 || element.scale.y !== 1) {
+                    transform += `scale(${element.scale.x}, ${element.scale.y}) `;
+                }
+                
+                el.style.transform = transform.trim();
+                
+                // Внешний вид
+                if (element.type === 'particle' && element.particleData) {
+                    // Создаем контейнер для партиклов
+                    const particleContainer = document.createElement('div');
+                    particleContainer.className = 'particle-container';
+                    particleContainer.style.position = 'absolute';
+                    particleContainer.style.width = '100%';
+                    particleContainer.style.height = '100%';
+                    
+                    // Создаем партиклы
+                    for (let i = 0; i < element.particleData.maxParticles; i++) {
+                        const particle = document.createElement('div');
+                        particle.className = 'particle';
+                        particle.style.position = 'absolute';
+                        particle.style.width = `${element.particleData.startParticleSize}px`;
+                        particle.style.height = `${element.particleData.startParticleSize}px`;
+                        particle.style.backgroundImage = `url('res/${element.particleData.texture}')`;
+                        particle.style.backgroundSize = 'contain';
+                        particle.style.backgroundRepeat = 'no-repeat';
+                        particle.style.backgroundPosition = 'center';
+                        particle.style.opacity = element.particleData.startColor.a;
+                        particle.style.backgroundColor = `rgba(${element.particleData.startColor.r * 255}, ${element.particleData.startColor.g * 255}, ${element.particleData.startColor.b * 255}, ${element.particleData.startColor.a})`;
+                        
+                        // Анимация партикла
+                        const animation = particle.animate([
+                            {
+                                transform: 'translate(0, 0) scale(1)',
+                                opacity: element.particleData.startColor.a
+                            },
+                            {
+                                transform: `translate(${Math.random() * element.particleData.sourcePositionVariance.x - element.particleData.sourcePositionVariance.x/2}px, ${Math.random() * element.particleData.sourcePositionVariance.y - element.particleData.sourcePositionVariance.y/2}px) scale(0)`,
+                                opacity: element.particleData.finishColor.a
+                            }
+                        ], {
+                            duration: (element.particleData.particleLifespan + Math.random() * element.particleData.particleLifespanVariance) * 1000,
+                            iterations: Infinity,
+                            delay: Math.random() * 1000
+                        });
+                        
+                        particleContainer.appendChild(particle);
+                    }
+                    
+                    el.appendChild(particleContainer);
+                } else if (element.texture && textureCache.has(element.texture)) {
+                    el.style.backgroundImage = `url('res/${element.texture}')`;
+                    // Добавляем анимацию для текстур огня
+                    if (element.texture === 'Fire_01.png') {
+                        el.classList.add('fire1-animation');
+                    } else if (element.texture === 'Fire_02.png') {
+                        el.classList.add('fire2-animation');
+                    } else if (element.texture === 'FireTrap_r_looped_001.png') {
+                        el.classList.add('firetrap-animation');
+                    }
+                } else {
+                    el.classList.add('placeholder');
+                    el.style.backgroundColor = element.appearance.color;
+                    el.innerHTML = `<span>${element.appearance.text}</span>`;
+                }
+                
+                // Добавляем классы анимации
+                if (element.elementData.customAnim) {
+                    el.classList.add(element.elementData.customAnim);
+                }
+                
+                // Добавляем элемент в соответствующий слой
+                if (element.type === 'background') {
+                    parallaxLayer.appendChild(el);
+                } else {
+                    objectLayer.appendChild(el);
+                }
+                
+                // Обработчики наведения
+                el.addEventListener('mouseenter', () => {
+                    const info = document.getElementById('element-info');
+                    let textureHtml = '';
+                    
+                    if (element.texture && textureCache.has(element.texture)) {
+                        textureHtml = `<img src="res/${element.texture}" alt="${element.texture}">`;
+                    }
+                    
+                    info.innerHTML = `
+                        ${textureHtml}
+                        <strong>ID:</strong> ${element.id}
+                        <strong>Type:</strong> ${element.type}
+                        <strong>Texture:</strong> ${element.texture || 'none'}
+                        <strong>Position:</strong> ${element.position.x}, ${element.position.y}
+                        <strong>Size:</strong> ${element.size.width}×${element.size.height}
+                        <strong>Scale:</strong> ${element.scale.x}, ${element.scale.y}
+                        <strong>Rotation:</strong> ${element.rotation}°
+                        <strong>Flipped:</strong> ${element.flipped.x ? 'X' : ''}${element.flipped.y ? 'Y' : ''}
+                        <strong>Z-index:</strong> ${element.zValue}
+                        <strong>Animation:</strong> ${element.elementData.customAnim || 'none'}
+                    `;
+                    info.style.display = 'block';
+                });
+                
+                el.addEventListener('mouseleave', () => {
+                    document.getElementById('element-info').style.display = 'none';
+                });
+            });
+        }
+
+        // File input handler
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            document.getElementById('loading').textContent = `Loading ${file.name}...`;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                loadAndBuildLevel(e.target.result);
+            };
+            reader.onerror = function() {
+                document.getElementById('error').textContent = 'Failed to read file';
+            };
+            reader.readAsText(file);
+        });
+
+        // Function to fetch available JSON files
+        async function fetchAvailableJsonFiles() {
+            try {
+                const response = await fetch('json/list.json');
+                if (!response.ok) throw new Error('Failed to fetch JSON list');
+                
+                const files = await response.json();
+                const select = document.getElementById('json-files');
+                
+                files.forEach(file => {
+                    const option = document.createElement('option');
+                    option.value = file;
+                    option.textContent = file;
+                    select.appendChild(option);
+                });
+                
+                select.addEventListener('change', async () => {
+                    if (select.value) {
+                        document.getElementById('loading').textContent = `Loading ${select.value}...`;
+                        try {
+                            const response = await fetch(`json/${select.value}`);
+                            if (!response.ok) throw new Error('Failed to load JSON file');
+                            
+                            const content = await response.text();
+                            await loadAndBuildLevel(content);
+                        } catch (error) {
+                            console.error('Error loading JSON:', error);
+                            document.getElementById('error').textContent = `Error loading ${select.value}: ${error.message}`;
+                            document.getElementById('loading').textContent = 'Failed to load level';
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error fetching JSON list:', error);
+                document.getElementById('error').textContent = 'Error: Could not load JSON list';
+            }
+        }
+
+        // Предварительная загрузка изображений для анимаций
+        function preloadAnimationImages() {
+            // Предварительная загрузка больше не нужна
+        }
+
+        // Initialize
+        initCameraControls();
+        fetchAvailableJsonFiles();
+        preloadAnimationImages();
+    </script>
+</body>
+</html>
