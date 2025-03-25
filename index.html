@@ -47,6 +47,10 @@
             backface-visibility: hidden;
             -webkit-backface-visibility: hidden;
         }
+        .level-element.show-hitboxes {
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 1px dashed rgba(255, 255, 255, 0.7);
+        }
         .level-element.placeholder {
             border: 1px dashed rgba(255, 255, 255, 0.5);
             display: flex;
@@ -55,10 +59,6 @@
             color: white;
             font-size: 10px;
             font-family: 'Pusab', Arial, sans-serif;
-        }
-        .curved-element {
-            background-color: rgba(100, 255, 100, 0.2);
-            border: 1px dashed rgba(100, 255, 100, 0.7);
         }
         #loading {
             position: fixed;
@@ -337,6 +337,7 @@
         <button class="control-btn" id="zoom-in">+ Zoom In</button>
         <button class="control-btn" id="zoom-out">- Zoom Out</button>
         <button class="control-btn" id="reset-view">Reset View</button>
+        <button class="control-btn" id="toggle-hitboxes">Hitboxes</button>
         <div>Use arrows to pan</div>
         <a href="https://github.com/zemonkamin/forlorn_web_levels" target="_blank" class="control-btn">Source code</a>
     </div>
@@ -351,6 +352,7 @@
         let isDragging = false;
         let lastMouseX = 0;
         let lastMouseY = 0;
+        let showHitboxes = false;
 
         // Initialize camera controls
         function initCameraControls() {
@@ -485,6 +487,20 @@
             
             document.getElementById('coord-y').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') document.getElementById('go-to-coords').click();
+            });
+
+            // Добавляем обработчик для кнопки хитбоксов
+            document.getElementById('toggle-hitboxes').addEventListener('click', () => {
+                showHitboxes = !showHitboxes;
+                const elements = document.querySelectorAll('.level-element');
+                elements.forEach(el => {
+                    if (showHitboxes) {
+                        el.classList.add('show-hitboxes');
+                    } else {
+                        el.classList.remove('show-hitboxes');
+                    }
+                });
+                document.getElementById('toggle-hitboxes').style.backgroundColor = showHitboxes ? '#666' : '#444';
             });
         }
 
